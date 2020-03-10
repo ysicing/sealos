@@ -9,7 +9,7 @@ const (
 	CALICO  = "calico"
 	FLANNEL = "flannel"
 	defaultInterface = "eth.*|en.*"
-	defaultCIDR = "100.64.0.0/10"
+	defaultCIDR = "192.168.0.0/16"
 )
 
 type MetaData struct {
