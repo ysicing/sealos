@@ -32,7 +32,7 @@ metadata:
 data:
   typha_service_name: "none"
   calico_backend: "bird"
-  veth_mtu: "1440"
+  veth_mtu: "{{ .MTU }}"
   cni_network_config: |-
     {
       "name": "k8s-pod-network",
@@ -578,7 +578,7 @@ spec:
             - name: IP_AUTODETECTION_METHOD
               value: "interface={{ .Interface }}"
             - name: CALICO_IPV4POOL_IPIP
-              value: "Always"
+              value: "{{if not .IPIP }}Off{{else}}Always{{end}}"
             - name: FELIX_IPINIPMTU
               valueFrom:
                 configMapKeyRef:
