@@ -33,10 +33,6 @@ var contact = `
     \::/  /       \:\__\         /:/  /       \:\__\    \::/  /       \::/  /   
      \/__/         \/__/         \/__/         \/__/     \/__/         \/__/  
 
-                  官方文档：sealyun.com
-                  项目地址：github.com/fanux/sealos
-                  QQ群   ：98488045
-                  常见问题：sealyun.com/faq
 `
 
 // initCmd represents the init command
@@ -68,8 +64,8 @@ func init() {
 	initCmd.Flags().StringSliceVar(&install.NodeIPs, "node", []string{}, "kubernetes multi-nodes ex. 192.168.0.5-192.168.0.5")
 
 	initCmd.Flags().StringVar(&install.PkgUrl, "pkg-url", "", "http://store.lameleg.com/kube1.14.1.tar.gz download offline package url, or file location ex. /root/kube1.14.1.tar.gz")
-	initCmd.Flags().StringVar(&install.Version, "version", "v1.14.1", "version is kubernetes version")
-	initCmd.Flags().StringVar(&install.Repo, "repo", "k8s.gcr.io", "choose a container registry to pull control plane images from")
+	initCmd.Flags().StringVar(&install.Version, "version", "v1.18.2", "version is kubernetes version")
+	initCmd.Flags().StringVar(&install.Repo, "repo", "hub.51talk.com/k8s", "choose a container registry to pull control plane images from")
 	initCmd.Flags().StringVar(&install.PodCIDR, "podcidr", "100.64.0.0/10", "Specify range of IP addresses for the pod network")
 	initCmd.Flags().StringVar(&install.SvcCIDR, "svccidr", "10.96.0.0/12", "Use alternative range of IP address for service VIPs")
 	initCmd.Flags().StringVar(&install.Interface, "interface", "eth.*|en.*|em.*", "name of network interface")
@@ -79,7 +75,7 @@ func init() {
 	initCmd.Flags().BoolVar(&install.IPIP, "ipip", true, "ipip mode enable, calico..")
 	initCmd.Flags().StringVar(&install.MTU, "mtu", "1440", "mtu of the ipip mode , calico..")
 
-	initCmd.Flags().StringVar(&install.LvscareImage.Image, "lvscare-image", "fanux/lvscare", "lvscare image name")
+	initCmd.Flags().StringVar(&install.LvscareImage.Image, "lvscare-image", "hub.51talk.com/k8s/lvscare", "lvscare image name")
 	initCmd.Flags().StringVar(&install.LvscareImage.Tag, "lvscare-tag", "latest", "lvscare image tag name")
 
 	// 不像用户暴露

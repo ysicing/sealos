@@ -43,18 +43,18 @@ node0|192.168.0.5
 
 ```sh
 # 下载并安装sealos, sealos是个golang的二进制工具，直接下载拷贝到bin目录即可, release页面也可下载
-$ wget -c https://sealyun.oss-cn-beijing.aliyuncs.com/latest/sealos && \
+$ wget -c https://mirrors.51talk.com/devops/k8s/sealos-51talk-linux-amd64 && \
     chmod +x sealos && mv sealos /usr/bin 
 
 # 下载离线资源包
-$ wget -c https://sealyun.oss-cn-beijing.aliyuncs.com/d551b0b9e67e0416d0f9dce870a16665-1.18.0/kube1.18.0.tar.gz 
+$ wget -c https://mirrors.51talk.com/devops/k8s/kube.1.18.2.tgz 
 
 # 安装一个三master的kubernetes集群
 $ sealos init --passwd 123456 \
 	--master 192.168.0.2  --master 192.168.0.3  --master 192.168.0.4  \
 	--node 192.168.0.5 \
-	--pkg-url /root/kube1.18.0.tar.gz \
-	--version v1.18.0
+	--pkg-url /root/kube.1.18.2.tgz \
+	--version v1.18.2
 ```
 
 > 参数含义
@@ -65,7 +65,7 @@ passwd|服务器密码|123456
 master|k8s master节点IP地址| 192.168.0.2
 node|k8s node节点IP地址|192.168.0.3
 pkg-url|离线资源包地址，支持下载到本地，或者一个远程地址|/root/kube1.16.0.tar.gz
-version|[资源包](http://store.lameleg.com)对应的版本|v1.16.0
+version对应的版本|v1.16.0
 
 > 增加master
 
