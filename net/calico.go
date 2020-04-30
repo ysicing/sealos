@@ -36,7 +36,12 @@ data:
   typha_service_name: "none"
   # Configure the backend to use.
   calico_backend: "bird"
+
+  # Configure the MTU to use
   veth_mtu: "{{ .MTU }}"
+
+  # The CNI network configuration to install on each node.  The special
+  # values in this config will be automatically populated.
   cni_network_config: |-
     {
       "name": "k8s-pod-network",
@@ -538,7 +543,7 @@ spec:
         # It can be deleted if this is a fresh installation, or if you have already
         # upgraded to use calico-ipam.
         - name: upgrade-ipam
-          image: calico/cni:v3.13.2
+          image: calico/cni:v3.13.3
           command: ["/opt/cni/bin/calico-ipam", "-upgrade"]
           env:
             - name: KUBERNETES_NODE_NAME
@@ -560,7 +565,7 @@ spec:
         # This container installs the CNI binaries
         # and CNI network config file on each node.
         - name: install-cni
-          image: calico/cni:v3.13.2
+          image: calico/cni:v3.13.3
           command: ["/install-cni.sh"]
           env:
             # Name of the CNI config file to create.
@@ -596,7 +601,7 @@ spec:
         # Adds a Flex Volume Driver that creates a per-pod Unix Domain Socket to allow Dikastes
         # to communicate with Felix over the Policy Sync API.
         - name: flexvol-driver
-          image: calico/pod2daemon-flexvol:v3.13.2
+          image: calico/pod2daemon-flexvol:v3.13.3
           volumeMounts:
           - name: flexvol-driver-host
             mountPath: /host/driver
@@ -607,7 +612,7 @@ spec:
         # container programs network policy and routes on each
         # host.
         - name: calico-node
-          image: calico/node:v3.13.2
+          image: calico/node:v3.13.3
           env:
             # Use Kubernetes API as the backing datastore.
             - name: DATASTORE_TYPE
@@ -615,17 +620,21 @@ spec:
             # Wait for the datastore.
             - name: WAIT_FOR_DATASTORE
               value: "true"
+            # Set based on the k8s node name.
             - name: NODENAME
               valueFrom:
                 fieldRef:
                   fieldPath: spec.nodeName
+            # Choose the backend to use.
             - name: CALICO_NETWORKING_BACKEND
               valueFrom:
                 configMapKeyRef:
                   name: calico-config
                   key: calico_backend
+            # Cluster type to identify the deployment type
             - name: CLUSTER_TYPE
               value: "k8s,bgp"
+            # Auto-detect the BGP IP address.
             - name: IP
               value: "autodetect"
             - name: IP_AUTODETECTION_METHOD
@@ -641,10 +650,13 @@ spec:
               value: "{{ .CIDR }}"
             - name: CALICO_DISABLE_FILE_LOGGING
               value: "true"
+            # Set Felix endpoint to host default action to ACCEPT.
             - name: FELIX_DEFAULTENDPOINTTOHOSTACTION
               value: "ACCEPT"
+            # Disable IPv6 on Kubernetes.
             - name: FELIX_IPV6SUPPORT
               value: "false"
+            # Set Felix logging to "info"
             - name: FELIX_LOGSEVERITYSCREEN
               value: "info"
             - name: FELIX_HEALTHENABLED
@@ -686,6 +698,7 @@ spec:
             - name: policysync
               mountPath: /var/run/nodeagent
       volumes:
+        # Used by calico-node.
         - name: lib-modules
           hostPath:
             path: /lib/modules
@@ -699,19 +712,25 @@ spec:
           hostPath:
             path: /run/xtables.lock
             type: FileOrCreate
+        # Used to install CNI.
         - name: cni-bin-dir
           hostPath:
             path: /opt/cni/bin
         - name: cni-net-dir
           hostPath:
             path: /etc/cni/net.d
+        # Mount in the directory for host-local IPAM allocations. This is
+        # used when upgrading from host-local to calico-ipam, and can be removed
+        # if not using the upgrade-ipam init container.
         - name: host-local-net-dir
           hostPath:
             path: /var/lib/cni/networks
+        # Used to create per-pod Unix Domain Sockets
         - name: policysync
           hostPath:
             type: DirectoryOrCreate
             path: /var/run/nodeagent
+        # Used to install Flex Volume Driver
         - name: flexvol-driver-host
           hostPath:
             type: DirectoryOrCreate
@@ -725,6 +744,9 @@ metadata:
   namespace: kube-system
 
 ---
+# Source: calico/templates/calico-kube-controllers.yaml
+
+# See https://github.com/projectcalico/kube-controllers
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -733,6 +755,7 @@ metadata:
   labels:
     k8s-app: calico-kube-controllers
 spec:
+  # The controllers can only have a single active instance.
   replicas: 1
   selector:
     matchLabels:
@@ -751,6 +774,7 @@ spec:
       nodeSelector:
         kubernetes.io/os: linux
       tolerations:
+        # Mark the pod as a critical add-on for rescheduling.
         - key: CriticalAddonsOnly
           operator: Exists
         - key: node-role.kubernetes.io/master
@@ -759,8 +783,9 @@ spec:
       priorityClassName: system-cluster-critical
       containers:
         - name: calico-kube-controllers
-          image: calico/kube-controllers:v3.13.2
+          image: calico/kube-controllers:v3.13.3
           env:
+            # Choose which controllers to run.
             - name: ENABLED_CONTROLLERS
               value: node
             - name: DATASTORE_TYPE
@@ -778,4 +803,12 @@ kind: ServiceAccount
 metadata:
   name: calico-kube-controllers
   namespace: kube-system
+---
+# Source: calico/templates/calico-etcd-secrets.yaml
+
+---
+# Source: calico/templates/calico-typha.yaml
+
+---
+# Source: calico/templates/configure-canal.yaml
 `
