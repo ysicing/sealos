@@ -35,7 +35,7 @@ func BuildInit() {
 	//生成kubeconfig的时候kubeadm的kubeconfig阶段会检查硬盘是否kubeconfig，有则跳过
 	//不用kubeadm init加选项跳过[kubeconfig]的阶段
 	i.CreateKubeconfig()
-
+	i.WriteNodeIP()
 	i.InstallMaster0()
 	i.Print("SendPackage", "KubeadmConfigInstall", "InstallMaster0")
 	if len(masters) > 1 {

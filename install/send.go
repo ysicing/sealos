@@ -19,14 +19,14 @@ func (s *SealosInstaller) SendPackage() {
 	SendPackage(sealos, s.Hosts, "/usr/bin", &beforeHook, &afterHook)
 }
 
-func (s *SealosInstaller)LoadImages() {
+func (s *SealosInstaller) LoadImages() {
 	pkg := path.Base(PkgUrl)
 	cmd := fmt.Sprintf("cd /root && rm -rf kube && tar zxvf %s  && cd /root/kube/shell && sh init.sh", pkg)
 	var w sync.WaitGroup
-	for _,host := range s.Hosts {
+	for _, host := range s.Hosts {
 		w.Add(1)
 		go func(host string) {
-			SSHConfig.CmdAsync(host,cmd)
+			SSHConfig.CmdAsync(host, cmd)
 			w.Done()
 		}(host)
 	}

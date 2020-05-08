@@ -32,6 +32,7 @@ func joinMastersFunc(joinMasters []string) {
 	i.CheckValid()
 	i.SendPackage()
 	i.GeneratorCerts()
+	i.WriteNodeIP()
 	i.JoinMasters(joinMasters)
 	//master join to MasterIPs
 	MasterIPs = append(MasterIPs, joinMasters...)
@@ -51,6 +52,7 @@ func joinNodesFunc(joinNodes []string) {
 	i.CheckValid()
 	i.SendPackage()
 	i.GeneratorToken()
+	i.WriteNodeIP()
 	i.JoinNodes()
 	//node join to NodeIPs
 	NodeIPs = append(NodeIPs, joinNodes...)
@@ -175,5 +177,13 @@ func (s *SealosInstaller) sendCerts(hosts []string) {
 	for _, cert := range certConfigs {
 		SendPackage(path.Join(cert.Path, cert.BaseName+".key"), hosts, cert.DefaultPath, nil, nil)
 		SendPackage(path.Join(cert.Path, cert.BaseName+".crt"), hosts, cert.DefaultPath, nil, nil)
+	}
+}
+
+func (s *SealosInstaller) WriteNodeIP() {
+	for _, ip := range s.Hosts {
+		logger.Debug("node ip: ", strings.Split(ip, ":")[0])
+		ext := fmt.Sprintf(`echo 'KUBELET_EXTRA_ARGS="--node-ip=%v"' > /etc/default/kubelet`, strings.Split(ip, ":")[0])
+		SSHConfig.Cmd(ip, ext)
 	}
 }
