@@ -27,6 +27,7 @@ func BuildInit() {
 	i.CheckValid()
 	i.Print()
 	i.SendPackage()
+	i.LoadImages()
 	i.Print("SendPackage")
 	i.KubeadmConfigInstall()
 	i.Print("SendPackage", "KubeadmConfigInstall")
@@ -106,7 +107,7 @@ func (s *SealosInstaller) CreateKubeconfig() {
 
 	controlPlaneEndpoint := fmt.Sprintf("https://%s:6443", ApiServer)
 
-	err := cert.CreateJoinControlPlaneKubeConfigFiles(cert.KubernetesDir,
+	err := cert.CreateJoinControlPlaneKubeConfigFiles(cert.SealosConfigDir,
 		certConfig, hostname, controlPlaneEndpoint, "kubernetes")
 	if err != nil {
 		logger.Error("generator kubeconfig failed %s", err)
