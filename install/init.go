@@ -80,7 +80,7 @@ func (s *SealosInstaller) KubeadmConfigInstall() {
 }
 
 func getDefaultSANs() []string {
-	var sans = []string{"127.0.0.1", "apiserver.cluster.local", VIP}
+	var sans = []string{"127.0.0.1", "apiserver.cluster.local", "ergo.local", VIP}
 	for _, master := range MasterIPs {
 		sans = append(sans, IpFormat(master))
 	}
