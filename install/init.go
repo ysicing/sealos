@@ -27,7 +27,6 @@ func BuildInit() {
 	i.CheckValid()
 	i.Print()
 	i.SendPackage()
-	i.LoadImages()
 	i.Print("SendPackage")
 	i.KubeadmConfigInstall()
 	i.Print("SendPackage", "KubeadmConfigInstall")
@@ -93,7 +92,7 @@ func (s *SealosInstaller) GenerateCert() {
 	cert.GenerateCert(CertPath, CertEtcdPath, ApiServerCertSANs, IpFormat(s.Masters[0]), hostname, SvcCIDR, DnsDomain)
 	//copy all cert to master0
 	//CertSA(kye,pub) + CertCA(key,crt)
-	s.sendCaAndKey([]string{s.Masters[0]})
+	s.sendCaAndKey(s.Masters)
 	s.sendCerts([]string{s.Masters[0]})
 }
 
@@ -101,7 +100,7 @@ func (s *SealosInstaller) CreateKubeconfig() {
 	hostname := GetRemoteHostName(s.Masters[0])
 
 	certConfig := cert.Config{
-		Path:     cert.KubeDefaultCertPath,
+		Path:     CertPath,
 		BaseName: "ca",
 	}
 
