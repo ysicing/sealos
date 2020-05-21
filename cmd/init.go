@@ -68,7 +68,7 @@ func init() {
 	initCmd.Flags().StringSliceVar(&install.NodeIPs, "node", []string{}, "kubernetes multi-nodes ex. 192.168.0.5-192.168.0.5")
 
 	initCmd.Flags().StringVar(&install.PkgUrl, "pkg-url", "", "http://store.lameleg.com/kube1.14.1.tar.gz download offline package url, or file location ex. /root/kube1.14.1.tar.gz")
-	initCmd.Flags().StringVar(&install.Version, "version", "v1.18.2", "version is kubernetes version")
+	initCmd.Flags().StringVar(&install.Version, "version", "v1.18.3", "version is kubernetes version")
 	initCmd.Flags().StringVar(&install.Repo, "repo", "registry.cn-hangzhou.aliyuncs.com/google_containers", "choose a container registry to pull control plane images from")
 	initCmd.Flags().StringVar(&install.PodCIDR, "podcidr", "100.64.0.0/10", "Specify range of IP addresses for the pod network")
 	initCmd.Flags().StringVar(&install.SvcCIDR, "svccidr", "10.96.0.0/12", "Use alternative range of IP address for service VIPs")
