@@ -66,7 +66,7 @@ all:
 	}
 end:
 	if len(i.Masters) == 0 && len(i.Nodes) == 0 {
-		logger.Debug("clean nodes and masters is skip")
+		logger.Warn("clean nodes and masters is empty,please check your args and config.yaml.")
 		os.Exit(-1)
 	}
 	i.CheckValid()
@@ -152,6 +152,8 @@ func (s *SealosClean) cleanMaster(master string) {
 
 func clean(host string) {
 	cmd := "kubeadm reset -f " + vlogToStr()
+	_ = SSHConfig.CmdAsync(host, cmd)
+	cmd = fmt.Sprintf("sed -i \"/%s/d\" /root/.bashrc ", "kubectl")
 	_ = SSHConfig.CmdAsync(host, cmd)
 	cmd = "modprobe -r ipip  && lsmod"
 	_ = SSHConfig.CmdAsync(host, cmd)
