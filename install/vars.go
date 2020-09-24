@@ -11,6 +11,7 @@ import (
 var (
 	MasterIPs []string
 	NodeIPs   []string
+	CertSANS  []string
 	//config from kubeadm.cfg
 	DnsDomain         string
 	ApiServerCertSANs []string
@@ -27,6 +28,11 @@ var (
 	Repo    string
 	PodCIDR string
 	SvcCIDR string
+
+	Envs          []string // read env from -e
+	PackageConfig string   // install/delete package config
+	Values        string   // values for  install package values.yaml
+	WorkDir       string   // workdir for install/delete package home
 
 	//
 	Ipvs         care.LvsCare
@@ -49,6 +55,19 @@ var (
 	CleanAll   bool
 
 	Vlog int
+
+	// etcd backup
+	InDocker         bool
+	SnapshotName     string
+	EtcdBackDir      string
+	RestorePath      string
+
+	// oss
+	OssEndpoint         string
+	AccessKeyId      string
+	AccessKeySecrets string
+	BucketName       string
+	ObjectPath       string
 )
 
 func vlogToStr() string {

@@ -23,6 +23,7 @@ type SealConfig struct {
 	User       string
 	Passwd     string
 	PrivateKey string
+	PkPassword string
 	//ApiServer ex. apiserver.cluster.local
 	ApiServerDomian string
 
@@ -38,6 +39,7 @@ type SealConfig struct {
 	//lvscare images
 	LvscareName string
 	LvscareTag  string
+	AliOss
 }
 
 //Dump is
@@ -53,6 +55,7 @@ func (c *SealConfig) Dump(path string) {
 	c.User = SSHConfig.User
 	c.Passwd = SSHConfig.Password
 	c.PrivateKey = SSHConfig.PkFile
+	c.PkPassword = SSHConfig.PkPassword
 	c.ApiServerDomian = ApiServer
 	c.VIP = VIP
 	c.PkgURL = PkgUrl
@@ -68,6 +71,12 @@ func (c *SealConfig) Dump(path string) {
 	//lvscare
 	c.LvscareName = LvscareImage.Image
 	c.LvscareTag = LvscareImage.Tag
+	// oss
+	c.AliOss.AccessKeyId = AccessKeyId
+	c.AliOss.AccessKeySecrets = AccessKeySecrets
+	c.AliOss.OssEndpoint = OssEndpoint
+	c.AliOss.BucketName = BucketName
+	c.AliOss.ObjectPath = ObjectPath
 	y, err := yaml.Marshal(c)
 	if err != nil {
 		logger.Error("dump config file failed: %s", err)
@@ -122,6 +131,7 @@ func (c *SealConfig) Load(path string) (err error) {
 	SSHConfig.User = c.User
 	SSHConfig.Password = c.Passwd
 	SSHConfig.PkFile = c.PrivateKey
+	SSHConfig.PkPassword = c.PkPassword
 	ApiServer = c.ApiServerDomian
 	VIP = c.VIP
 	PkgUrl = c.PkgURL
@@ -137,6 +147,16 @@ func (c *SealConfig) Load(path string) (err error) {
 	//lvscare
 	LvscareImage.Image = c.LvscareName
 	LvscareImage.Tag = c.LvscareTag
+
+	// 优先使用使用命令行， 再使用配置文件
+	if AccessKeyId == "" || AccessKeySecrets == "" ||
+		OssEndpoint == "" || BucketName == "" || ObjectPath == "" {
+		AccessKeyId = c.AliOss.AccessKeyId
+		AccessKeySecrets = c.AliOss.AccessKeySecrets
+		OssEndpoint = c.AliOss.OssEndpoint
+		BucketName = c.AliOss.BucketName
+		ObjectPath = c.AliOss.ObjectPath
+	}
 	return
 }
 

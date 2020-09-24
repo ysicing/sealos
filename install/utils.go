@@ -1,17 +1,123 @@
 package install
 
 import (
+	"archive/tar"
+	"archive/zip"
+	"compress/gzip"
+	"crypto/tls"
 	"fmt"
 	"github.com/wonderivan/logger"
+	"io"
 	"math/big"
 	"math/rand"
 	"net"
+	"net/http"
+	"net/url"
 	"os"
+	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
 )
+
+var message string
+
+// ExitOSCase is
+func ExitInitCase() bool {
+	// 重大错误直接退出, 不保存配置文件
+	if len(MasterIPs) == 0 {
+		message = ErrorMasterEmpty
+	}
+	if Version == "" {
+		message += ErrorVersionEmpty
+	}
+	// 用户不写 --passwd, 默认走pk, 秘钥如果没有配置ssh互信, 则验证ssh的时候报错. 应该属于preRun里面
+	// first to auth password, second auth pk.
+	// 如果初始状态都没写, 默认都为空. 报这个错
+	//if SSHConfig.Password == "" && SSHConfig.PkFile == "" {
+	//	message += ErrorMessageSSHConfigEmpty
+	//}
+	if message != "" {
+		logger.Error(message + "please check your command is ok?")
+		return true
+	}
+
+	return pkgUrlCheck(PkgUrl)
+}
+
+func ExitDeleteCase(pkgUrl string) bool {
+	if PackageConfig != "" && !FileExist(PackageConfig) {
+		logger.Error("your APP pkg-config File is not exist, Please check your pkg-config is exist")
+		return true
+	}
+	return pkgUrlCheck(pkgUrl)
+}
+
+func ExitInstallCase(pkgUrl string) bool {
+	// values.yaml 使用了-f 但是文件不存在. 并且不使用 stdin
+	if Values != "-" && !FileExist(Values) && Values != "" {
+		logger.Error("your values File is not exist and you have no stdin input, Please check your Values.yaml is exist")
+		return true
+	}
+	// PackageConfig 使用了-c 但是文件不存在
+	if PackageConfig != "" && !FileExist(PackageConfig) {
+		logger.Error("your install APP pkg-config File is not exist, Please check your pkg-config is exist")
+		return true
+	}
+	return pkgUrlCheck(pkgUrl)
+}
+
+func pkgUrlCheck(pkgUrl string) bool {
+	if !strings.HasPrefix(pkgUrl, "http") && !FileExist(pkgUrl) {
+		message = ErrorFileNotExist
+		logger.Error(message + "please check where your PkgUrl is right?")
+		return true
+	}
+	// 判断PkgUrl, 有http前缀时, 下载的文件如果小于400M ,则报错.
+	return strings.HasPrefix(pkgUrl, "http") && !downloadFileCheck(pkgUrl)
+}
+
+func downloadFileCheck(pkgUrl string) bool {
+	u, err := url.Parse(pkgUrl)
+	if err != nil {
+		return false
+	}
+	if u != nil {
+		req, err := http.NewRequest("GET", u.String(), nil)
+		if err != nil {
+			logger.Error(ErrorPkgUrlNotExist, "please check where your PkgUrl is right?")
+			return false
+		}
+		client := &http.Client{
+			Transport: &http.Transport{
+				TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+			},
+		}
+		_, err = client.Do(req)
+		if err != nil {
+			logger.Error(err)
+			return false
+		}
+		/*
+			if tp := resp.Header.Get("Content-Type"); tp != "application/x-gzip" {
+				logger.Error("your pkg url is  a ", tp, "file, please check your PkgUrl is right?")
+				return false
+			}
+		*/
+
+		//if resp.ContentLength < MinDownloadFileSize { //判断大小 这里可以设置成比如 400MB 随便设置一个大小
+		//	logger.Error("your pkgUrl download file size is : ", resp.ContentLength/1024/1024, "m, please check your PkgUrl is right")
+		//	return false
+		//}
+	}
+	return true
+}
+
+func FileExist(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil || os.IsExist(err)
+}
 
 //VersionToInt v1.15.6  => 115
 func VersionToInt(version string) int {
@@ -21,6 +127,19 @@ func VersionToInt(version string) int {
 	if len(versionArr) >= 2 {
 		versionStr := versionArr[0] + versionArr[1]
 		if i, err := strconv.Atoi(versionStr); err == nil {
+			return i
+		}
+	}
+	return 0
+}
+
+//VersionToIntAll v1.19.1 ==> 1191
+func VersionToIntAll(version string) int {
+	version = strings.Replace(version,"v","", -1)
+	arr := strings.Split(version,".")
+	if len(arr) >= 3 {
+		str := arr[0] + arr[1] + arr[2]
+		if i, err := strconv.Atoi(str) ;err == nil {
 			return i
 		}
 	}
@@ -182,4 +301,142 @@ func FetchSealosAbsPath() string {
 	ex, _ := os.Executable()
 	exPath := filepath.Dir(ex)
 	return exPath + string(os.PathSeparator) + os.Args[0]
+}
+
+func CompressTar(srcDirPath string, destFilePath string) error {
+	fw, err := os.Create(destFilePath)
+	if err != nil {
+		return err
+	}
+	defer fw.Close()
+
+	gw := gzip.NewWriter(fw)
+	defer gw.Close()
+
+	tw := tar.NewWriter(gw)
+	defer tw.Close()
+
+	f, err := os.Open(srcDirPath)
+	if err != nil {
+		return err
+	}
+	fi, err := f.Stat()
+	if err != nil {
+		return err
+	}
+	if fi.IsDir() {
+		err = compressDir(srcDirPath, path.Base(srcDirPath), tw)
+		if err != nil {
+			return err
+		}
+	} else {
+		err := compressFile(srcDirPath, fi.Name(), tw, fi)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func compressDir(srcDirPath string, recPath string, tw *tar.Writer) error {
+	dir, err := os.Open(srcDirPath)
+	if err != nil {
+		return err
+	}
+	defer dir.Close()
+
+	fis, err := dir.Readdir(0)
+	if err != nil {
+		return err
+	}
+	for _, fi := range fis {
+		curPath := srcDirPath + "/" + fi.Name()
+
+		if fi.IsDir() {
+			err = compressDir(curPath, recPath+"/"+fi.Name(), tw)
+			if err != nil {
+				return err
+			}
+		}
+
+		err = compressFile(curPath, recPath+"/"+fi.Name(), tw, fi)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func compressFile(srcFile string, recPath string, tw *tar.Writer, fi os.FileInfo) error {
+	if fi.IsDir() {
+		hdr := new(tar.Header)
+		hdr.Name = recPath + "/"
+		hdr.Typeflag = tar.TypeDir
+		hdr.Size = 0
+		hdr.Mode = int64(fi.Mode())
+		hdr.ModTime = fi.ModTime()
+
+		err := tw.WriteHeader(hdr)
+		if err != nil {
+			return err
+		}
+	} else {
+		fr, err := os.Open(srcFile)
+		if err != nil {
+			return err
+		}
+		defer fr.Close()
+
+		hdr := new(tar.Header)
+		hdr.Name = recPath
+		hdr.Size = fi.Size()
+		hdr.Mode = int64(fi.Mode())
+		hdr.ModTime = fi.ModTime()
+
+		err = tw.WriteHeader(hdr)
+		if err != nil {
+			return err
+		}
+
+		_, err = io.Copy(tw, fr)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// CompressZip is  compress all file in fileDir , and zip to outputPath like unix  zip ./ -r  a.zip
+func CompressZip(fileDir string, outputPath string) error {
+	outFile, err := os.Create(outputPath)
+	if err != nil {
+		return err
+	}
+	defer outFile.Close()
+	w := zip.NewWriter(outFile)
+	defer w.Close()
+
+	return filepath.Walk(fileDir, func(path string, f os.FileInfo, err error) error {
+		if f == nil {
+			return err
+		}
+		if f.IsDir() {
+			return nil
+		}
+		rel, _ := filepath.Rel(fileDir, path)
+		fmt.Println(rel, path)
+		compress(rel, path, w)
+		return nil
+	})
+
+}
+
+func compress(rel string, path string, zw *zip.Writer) {
+	file, _ := os.Open(path)
+	info, _ := file.Stat()
+	header, _ := zip.FileInfoHeader(info)
+	header.Name = rel
+	writer, _ := zw.CreateHeader(header)
+	io.Copy(writer, file)
+	defer file.Close()
 }

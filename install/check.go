@@ -12,6 +12,9 @@ func SetHosts(hostip, hostName string) {
 	SSHConfig.CmdAsync(hostip, cmd)
 }
 
+
+
+
 //CheckValid is
 func (s *SealosInstaller) CheckValid() {
 	//hosts := append(Masters, Nodes...)

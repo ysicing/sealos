@@ -5,6 +5,8 @@ import (
 	"io/ioutil"
 	"os"
 
+	"github.com/fanux/sealos/k8s"
+
 	"github.com/fanux/sealos/cert"
 	"github.com/fanux/sealos/net"
 	"github.com/wonderivan/logger"
@@ -26,6 +28,7 @@ func BuildInit() {
 	}
 	i.CheckValid()
 	i.Print()
+	i.SendSealos()
 	i.SendPackage()
 	i.Print("SendPackage")
 	i.KubeadmConfigInstall()
@@ -65,7 +68,8 @@ func (s *SealosInstaller) KubeadmConfigInstall() {
 		}
 		templateData = string(TemplateFromTemplateContent(string(fileData)))
 	}
-	cmd := "echo \"" + templateData + "\" > /root/kubeadm-config.yaml"
+	cmd := fmt.Sprintf(`echo "%s" > /root/kubeadm-config.yaml`, templateData)
+	//cmd := "echo \"" + templateData + "\" > /root/kubeadm-config.yaml"
 	_ = SSHConfig.CmdAsync(s.Masters[0], cmd)
 	//读取模板数据
 	kubeadm := KubeadmDataFromYaml(templateData)
@@ -79,7 +83,11 @@ func (s *SealosInstaller) KubeadmConfigInstall() {
 }
 
 func getDefaultSANs() []string {
-	var sans = []string{"127.0.0.1", "apiserver.cluster.local", "ergo.local", VIP}
+	var sans = []string{"127.0.0.1", "apiserver.cluster.local", VIP}
+	// 指定的certSANS不为空, 则添加进去
+	if len(CertSANS) != 0 {
+		sans = append(sans, CertSANS...)
+	}
 	for _, master := range MasterIPs {
 		sans = append(sans, IpFormat(master))
 	}
@@ -120,7 +128,7 @@ func (s *SealosInstaller) InstallMaster0() {
 	s.SendKubeConfigs(s.Masters, true)
 
 	//master0 do sth
-	cmd := fmt.Sprintf("echo %s %s >> /etc/hosts", IpFormat(s.Masters[0]), ApiServer)
+	cmd := fmt.Sprintf("grep -qF '%s %s' /etc/hosts || echo %s %s >> /etc/hosts", IpFormat(s.Masters[0]), ApiServer, IpFormat(s.Masters[0]), ApiServer)
 	_ = SSHConfig.CmdAsync(s.Masters[0], cmd)
 
 	cmd = s.Command(Version, InitMaster)
@@ -140,6 +148,14 @@ func (s *SealosInstaller) InstallMaster0() {
 		return
 	}
 	//cmd = `kubectl apply -f /root/kube/conf/net/calico.yaml || true`
+
+	// can-reach is used by calico multi network
+	if k8s.IsIpv4(Interface) {
+		Interface = "can-reach=" + Interface
+	} else {
+		Interface = "interface=" + Interface
+	}
+
 	netyaml := net.NewNetwork(Network, net.MetaData{
 		Interface: Interface,
 		CIDR:      PodCIDR,
@@ -160,4 +176,17 @@ func (s *SealosInstaller) SendKubeConfigs(masters []string, isMaster0 bool) {
 	SendPackage(cert.SealosConfigDir+"/admin.conf", masters, cert.KubernetesDir, nil, nil)
 	SendPackage(cert.SealosConfigDir+"/controller-manager.conf", masters, cert.KubernetesDir, nil, nil)
 	SendPackage(cert.SealosConfigDir+"/scheduler.conf", masters, cert.KubernetesDir, nil, nil)
+
+	// fix > 1.19.1 kube-controller-manager and kube-scheduler use the LocalAPIEndpoint instead of the ControlPlaneEndpoint.
+	if VersionToIntAll(Version) >= 1191 && VersionToIntAll(Version) <= 1192 {
+		for _, v := range s.Masters {
+			ip := IpFormat(v)
+			// use grep -qF if already use sed then skip....
+			cmd := fmt.Sprintf(`grep -qF "apiserver.cluster.local" %s  && \
+sed -i 's/apiserver.cluster.local/%s/' %s && \
+sed -i 's/apiserver.cluster.local/%s/' %s`, KUBESCHEDULERCONFIGFILE, ip, KUBECONTROLLERCONFIGFILE, ip, KUBESCHEDULERCONFIGFILE)
+			SSHConfig.CmdAsync(v, cmd)
+		}
+	}
+
 }

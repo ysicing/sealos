@@ -30,6 +30,7 @@ func joinMastersFunc(joinMasters []string) {
 		Nodes:   nodes,
 	}
 	i.CheckValid()
+	i.SendSealos()
 	i.SendPackage()
 	i.GeneratorCerts()
 	i.WriteNodeIP()
@@ -50,6 +51,7 @@ func joinNodesFunc(joinNodes []string) {
 		Nodes:   nodes,
 	}
 	i.CheckValid()
+	i.SendSealos()
 	i.SendPackage()
 	i.GeneratorToken()
 	i.WriteNodeIP()
@@ -84,6 +86,21 @@ func getApiserverHost(ipAddr string) (host string) {
 	return fmt.Sprintf("%s %s", ipAddr, ApiServer)
 }
 
+// sendJoinCPConfig send join CP nodes configuration
+func sendJoinCPConfig(joinMaster []string) {
+	var wg sync.WaitGroup
+	for _, master := range joinMaster {
+		wg.Add(1)
+		go func(master string) {
+			defer wg.Done()
+			templateData := string(JoinTemplate(master))
+			cmd := fmt.Sprintf(`echo "%s" > /root/kubeadm-join-config.yaml`,templateData)
+			_ = SSHConfig.CmdAsync(master, cmd)
+		}(master)
+	}
+	wg.Wait()
+}
+
 //JoinMasters is
 func (s *SealosInstaller) JoinMasters(masters []string) {
 	var wg sync.WaitGroup
@@ -91,6 +108,10 @@ func (s *SealosInstaller) JoinMasters(masters []string) {
 	s.sendCaAndKey(masters)
 
 	s.SendKubeConfigs(masters, false)
+
+	// send CP nodes configuration
+	sendJoinCPConfig(masters)
+
 	//join master do sth
 	cmd := s.Command(Version, JoinMaster)
 	for _, master := range masters {
@@ -103,6 +124,7 @@ func (s *SealosInstaller) JoinMasters(masters []string) {
 
 			cmdHosts := fmt.Sprintf("echo %s >> /etc/hosts", getApiserverHost(IpFormat(s.Masters[0])))
 			_ = SSHConfig.CmdAsync(master, cmdHosts)
+			// cmdMult := fmt.Sprintf("%s --apiserver-advertise-address %s", cmd, IpFormat(master))
 			_ = SSHConfig.CmdAsync(master, cmd)
 			cmdHosts = fmt.Sprintf(`sed "s/%s/%s/g" -i /etc/hosts`, getApiserverHost(IpFormat(s.Masters[0])), getApiserverHost(IpFormat(master)))
 			_ = SSHConfig.CmdAsync(master, cmdHosts)
@@ -130,6 +152,16 @@ func (s *SealosInstaller) JoinNodes() {
 			defer wg.Done()
 			cmdHosts := fmt.Sprintf("echo %s %s >> /etc/hosts", VIP, ApiServer)
 			_ = SSHConfig.CmdAsync(node, cmdHosts)
+
+			// 如果不是默认路由， 则添加 vip 到 master的路由。
+			cmdRoute := fmt.Sprintf("sealos route --host %s", IpFormat(node))
+			status := SSHConfig.CmdToString(node, cmdRoute, "")
+			if status != "ok" {
+				// 以自己的ip作为路由网关
+				addRouteCmd := fmt.Sprintf("sealos route add --host %s --gateway %s", VIP, IpFormat(node))
+				SSHConfig.CmdToString(node, addRouteCmd, "")
+			}
+
 			_ = SSHConfig.CmdAsync(node, ipvsCmd) // create ipvs rules before we join node
 			cmd := s.Command(Version, JoinNode)
 			//create lvscare static pod

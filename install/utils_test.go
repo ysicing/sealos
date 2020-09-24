@@ -122,3 +122,47 @@ func TestDecodeIPs(t *testing.T) {
 		})
 	}
 }
+
+func TestFileExist(t *testing.T) {
+	type args struct {
+		path string
+	}
+	tests := []struct {
+		name string
+		args args
+		want bool
+	}{
+		{"file exist", args{"/home/louis/.ssh/id_rsa"}, true},
+		{"file not exist", args{"/home/louis/.ssh/id_rsa.public"}, false},
+		{"PkgFile", args{"/root/kube1.18.0.tar.gz"}, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := FileExist(tt.args.path); got != tt.want {
+				t.Errorf("FileExist() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestVersionToIntAll(t *testing.T) {
+	type args struct {
+		version string
+	}
+	tests := []struct {
+		name string
+		args args
+		want int
+	}{
+		{"test01", args{"v1.19.1"}, 1191},
+		{"test02", args{"v1.15.1"}, 1151},
+		{"test03", args{"v1.15.13"}, 11513},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := VersionToIntAll(tt.args.version); got != tt.want {
+				t.Errorf("VersionToInt() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

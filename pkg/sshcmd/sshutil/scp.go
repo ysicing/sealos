@@ -8,8 +8,10 @@ import (
 	"github.com/wonderivan/logger"
 	"golang.org/x/crypto/ssh"
 	"io"
+	"io/ioutil"
 	"net"
 	"os"
+	"path"
 	"strings"
 	"time"
 )
@@ -168,8 +170,7 @@ func (ss *SSH) sftpConnect(host string) (*sftp.Client, error) {
 		err          error
 	)
 	// get auth method
-	auth = make([]ssh.AuthMethod, 0)
-	auth = append(auth, ss.sshAuthMethod(ss.Password, ss.PkFile))
+	auth = ss.sshAuthMethod(ss.Password, ss.PkFile, ss.PkPassword)
 
 	clientConfig = &ssh.ClientConfig{
 		User:    ss.User,
@@ -177,6 +178,9 @@ func (ss *SSH) sftpConnect(host string) (*sftp.Client, error) {
 		Timeout: 30 * time.Second,
 		HostKeyCallback: func(hostname string, remote net.Addr, key ssh.PublicKey) error {
 			return nil
+		},
+		Config: ssh.Config{
+			Ciphers: []string{"aes128-ctr", "aes192-ctr", "aes256-ctr", "aes128-gcm@openssh.com", "arcfour256", "arcfour128", "aes128-cbc", "3des-cbc", "aes192-cbc", "aes256-cbc"},
 		},
 	}
 
@@ -193,4 +197,134 @@ func (ss *SSH) sftpConnect(host string) (*sftp.Client, error) {
 	}
 
 	return sftpClient, nil
+}
+
+// CopyRemoteFileToLocal is scp remote file to local
+func (ss *SSH) CopyRemoteFileToLocal(host, localFilePath, remoteFilePath string) {
+	sftpClient, err := ss.sftpConnect(host)
+	defer func() {
+		if r := recover(); r != nil {
+			logger.Error("[ssh][%s]scpCopy: %s", host, err)
+		}
+	}()
+	if err != nil {
+		panic(1)
+	}
+	defer sftpClient.Close()
+	// open remote source file
+	srcFile, err := sftpClient.Open(remoteFilePath)
+	defer func() {
+		if r := recover(); r != nil {
+			logger.Error("[ssh][%s]scpCopy: %s", host, err)
+		}
+	}()
+	if err != nil {
+		panic(1)
+	}
+	defer srcFile.Close()
+
+	// open local Destination file
+	dstFile, err := os.Create(localFilePath)
+	defer func() {
+		if r := recover(); r != nil {
+			logger.Error("[ssh][%s]scpCopy: %s", host, err)
+		}
+	}()
+	if err != nil {
+		panic(1)
+	}
+	defer dstFile.Close()
+	// copy to local file
+	srcFile.WriteTo(dstFile)
+}
+
+// CopyLocalToRemote is copy file or dir to remotePath
+func (ss *SSH) CopyLocalToRemote(host, localPath, remotePath string) {
+	sftpClient, err := ss.sftpConnect(host)
+	defer func() {
+		if r := recover(); r != nil {
+			logger.Error("[ssh][%s]scpConnect err: %s", host, err)
+		}
+	}()
+	if err != nil {
+		panic(1)
+	}
+	defer sftpClient.Close()
+	s, _ := os.Stat(localPath)
+	if s.IsDir() {
+		ss.copyLocalDirToRemote(sftpClient, localPath, remotePath)
+	} else {
+		ss.copyLocalFileToRemote(sftpClient, localPath, remotePath)
+	}
+}
+
+// ssh session is a problem, 复用ssh链接
+func (ss *SSH) copyLocalDirToRemote(sftpClient *sftp.Client, localPath, remotePath string) {
+	localFiles, err := ioutil.ReadDir(localPath)
+	defer func() {
+		if r := recover(); r != nil {
+			logger.Error("readDir err : %s", err)
+		}
+	}()
+	if err != nil {
+		panic(1)
+	}
+	sftpClient.Mkdir(remotePath)
+	for _, file := range localFiles {
+		lfp := path.Join(localPath, file.Name())
+		rfp := path.Join(remotePath, file.Name())
+		if file.IsDir() {
+			sftpClient.Mkdir(rfp)
+			ss.copyLocalDirToRemote(sftpClient, lfp, rfp)
+		} else {
+			ss.copyLocalFileToRemote(sftpClient, lfp, rfp)
+		}
+	}
+}
+
+// solve the session
+func (ss *SSH) copyLocalFileToRemote(sftpClient *sftp.Client, localPath, remotePath string) {
+	srcFile, err := os.Open(localPath)
+	defer func() {
+		if r := recover(); r != nil {
+			logger.Error("open file [%s] err : %s", localPath, err)
+		}
+	}()
+	if err != nil {
+		panic(1)
+	}
+	defer srcFile.Close()
+	dstFile, err := sftpClient.Create(remotePath)
+	defer func() {
+		if r := recover(); r != nil {
+			logger.Error("Create remote File [%s] err: %s", remotePath, err)
+		}
+	}()
+	if err != nil {
+		panic(1)
+	}
+	defer dstFile.Close()
+	buf := make([]byte, 100*oneMBByte) //100mb
+	total := 0
+	unit := ""
+	for {
+		n, _ := srcFile.Read(buf)
+		if n == 0 {
+			break
+		}
+		length, _ := dstFile.Write(buf[0:n])
+		isKb := length/oneMBByte < 1
+		speed := 0
+		if isKb {
+			total += length
+			unit = "KB"
+			speed = length / oneKBByte
+		} else {
+			total += length
+			unit = "MB"
+			speed = length / oneMBByte
+		}
+		totalLength, totalUnit := toSizeFromInt(total)
+		logger.Info("[ssh]transfer [%s] total size is: %.2f%s ;speed is %d%s",localPath, totalLength, totalUnit, speed, unit)
+	}
 }
