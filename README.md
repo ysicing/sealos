@@ -1,10 +1,9 @@
  # 【重要通知】
  
- sealos即将贡献给阿里巴巴，更名为sealer [ˈsiːlər]密封罐意为把整个集群封装起来，会迎来一个大版本的升级。
+ [sealer](https://github.com/alibaba/sealer) [ˈsiːlər]密封罐意为把整个集群封装起来。
  
  阿里巴巴从去年五月份内部开始在某些场景使用sealos，内部fork的版本trident在sealos基础上作出了非常多的优化使系统更加稳定功能更加强大。
  21年开始重大创新的想法也彻底使sealos脱胎换骨，实现整个集群的 build share run, 我们希望这些能力也能够惠及更多开源社区的开发者们。
- 项目将继续开源~
  
  <a href="https://trackgit.com">
 <img src="https://us-central1-trackgit-analytics.cloudfunctions.net/token/ping/kexrkhvqjlzkdiap4zke" alt="trackgit-views" />
@@ -168,3 +167,11 @@ version|[资源包](https://www.sealyun.com/goodsDetail?type=cloud_kernel&name=k
 - [x] 上千用户在线上环境使用sealos，稳定可靠
 - [x] 资源包放在阿里云oss上，再也不用担心网速
 - [x] dashboard ingress prometheus等APP 同样离线打包，一键安装
+
+# 永久全系列产品超级VIP会员
+
+支付2波卡币(DOT)到下面账户，联系fanux（wechat:fangnux）开通，即可获得sealyun**所有产品的永久会员**
+![image](https://user-images.githubusercontent.com/8912557/122524041-45ac2900-d04a-11eb-96ae-33781d493f2d.png)
+
+12RE5Ps9bE8DXsqT6Xc1w4MxGanTkCmkJfxuUDdJpNWL75cX
+
